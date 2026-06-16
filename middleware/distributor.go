@@ -136,7 +136,7 @@ func Distribute() func(c *gin.Context) {
 						ModelName:   modelRequest.Model,
 						TokenGroup:  usingGroup,
 						Retry:       common.GetPointer(0),
-						RelayFormat: common.PathToRelayFormat(c.Request.URL.Path),
+						RelayFormat: model.PathToRelayFormat(c.Request.URL.Path),
 					})
 					if err != nil {
 						showGroup := usingGroup

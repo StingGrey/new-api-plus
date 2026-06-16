@@ -167,7 +167,7 @@ func GetRandomSatisfiedChannel(group string, model string, retry int, relayForma
 	if relayFormat != "" && len(targetChannels) > 1 {
 		var preferred []*Channel
 		for _, ch := range targetChannels {
-			if common.IsChannelPreferredForFormat(int(ch.Type), relayFormat) {
+			if IsChannelPreferredForFormat(int(ch.Type), relayFormat) {
 				preferred = append(preferred, ch)
 			}
 		}

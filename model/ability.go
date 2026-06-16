@@ -134,7 +134,7 @@ func GetChannel(group string, model string, retry int, relayFormat types.RelayFo
 		}
 		preferred := make([]Ability, 0)
 		for _, a := range abilities {
-			if common.IsChannelPreferredForFormat(typeMap[a.ChannelId], relayFormat) {
+			if IsChannelPreferredForFormat(typeMap[a.ChannelId], relayFormat) {
 				preferred = append(preferred, a)
 			}
 		}
