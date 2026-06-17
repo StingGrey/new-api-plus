@@ -242,6 +242,7 @@ export function RatioSettingsCard({
     modelNormalizedDefaults.current = {
       ModelPrice: normalizeJsonString(modelDefaults.ModelPrice),
       ModelRatio: normalizeJsonString(modelDefaults.ModelRatio),
+      ModelCost: normalizeJsonString(modelDefaults.ModelCost),
       CacheRatio: normalizeJsonString(modelDefaults.CacheRatio),
       CreateCacheRatio: normalizeJsonString(modelDefaults.CreateCacheRatio),
       CompletionRatio: normalizeJsonString(modelDefaults.CompletionRatio),
