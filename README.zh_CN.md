@@ -52,6 +52,16 @@
 
 </div>
 
+---
+
+> 🍴 **本仓库是 [New API](https://github.com/QuantumNous/new-api)（QuantumNous/new-api）的下游二次开发 fork。**
+>
+> **改动说明：** 本 fork 新增**按请求协议优先路由渠道**功能。转发请求时，优先选择 `type` 与请求协议匹配的渠道 —— 如 `/v1/messages` → Claude 透传渠道，`/v1/chat/completions`、`/v1/responses` → OpenAI 透传渠道。此举可规避 New API 原生的跨协议 tools 转换 bug（上游 [Issue #4755](https://github.com/QuantumNous/new-api/issues/4755)）。涉及文件：`model/protocol_match.go`、`model/channel_cache.go`、`model/ability.go`。
+>
+> 本项目遵循 **AGPLv3** 协议，并完整保留上游的 **Section 7** 附加条款 —— UI 页脚处及下方[许可证](#-许可证)段均保留 `Frontend design and development by New API contributors.` 署名与指向原项目的可见链接。
+
+---
+
 ## 📝 项目说明
 
 > [!IMPORTANT]
@@ -450,6 +460,8 @@ docker run --name new-api -d --restart always \
 ## 📜 许可证
 
 本项目采用 [GNU Affero 通用公共许可证 v3.0 (AGPLv3)](./LICENSE) 授权。
+
+适用 AGPLv3 第 7 条（Section 7）附加条款。修改版本须在相应的法律声明中，以及用户界面所呈现的任何显著的位置（关于、法律、页脚或署名位置）保留作者署名声明 `Frontend design and development by New API contributors.`。呈现用户界面的修改版本还须保留指向原项目的可见链接：<https://github.com/QuantumNous/new-api>。
 
 本项目为开源项目，在 [One API](https://github.com/songquanpeng/one-api)（MIT 许可证）的基础上进行二次开发。
 

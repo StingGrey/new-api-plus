@@ -52,6 +52,16 @@
 
 </div>
 
+---
+
+> 🍴 **This is a downstream fork of [New API](https://github.com/QuantumNous/new-api) (QuantumNous/new-api).**
+>
+> **What changed:** This fork adds **protocol-aware channel routing**. When relaying a request, channels whose `type` matches the request protocol are preferred — e.g. `/v1/messages` → Claude passthrough channels, `/v1/chat/completions` & `/v1/responses` → OpenAI passthrough channels. This sidesteps New API's native cross-protocol tools-conversion bug (upstream [Issue #4755](https://github.com/QuantumNous/new-api/issues/4755)). See `model/protocol_match.go`, `model/channel_cache.go`, `model/ability.go`.
+>
+> Licensed under **AGPLv3**, keeping the upstream's **Section 7** additional terms intact — the `Frontend design and development by New API contributors.` attribution and a visible link to the original project are preserved in the UI footer and in the [License](#-license) section below.
+
+---
+
 ## 📝 Project Description
 
 > [!IMPORTANT]
