@@ -1077,6 +1077,47 @@ func IncreaseUserDividend(id int, amount int) (err error) {
 		}).Error
 }
 
+// FreezeUserBalance 提现申请: 冻结余额(可用 -= amount, 冻结 += amount)。
+// type=1 本金: Quota-=amount, FrozenQuota+=amount; type=2 分红: DividendBalance-=amount, FrozenDividend+=amount。
+func FreezeUserBalance(id int, wtype, amount int) error {
+	if amount <= 0 {
+		return errors.New("amount 必须大于 0")
+	}
+	updates := map[string]interface{}{}
+	if wtype == WithdrawTypePrincipal {
+		updates["quota"] = gorm.Expr("quota - ?", amount)
+		updates["frozen_quota"] = gorm.Expr("frozen_quota + ?", amount)
+	} else {
+		updates["dividend_balance"] = gorm.Expr("dividend_balance - ?", amount)
+		updates["frozen_dividend"] = gorm.Expr("frozen_dividend + ?", amount)
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error
+}
+
+// ApproveUserWithdraw 提现审核通过: 清冻结额度(钱已线下打款给用户, 不退可用余额)。
+func ApproveUserWithdraw(id int, wtype, amount int) error {
+	updates := map[string]interface{}{}
+	if wtype == WithdrawTypePrincipal {
+		updates["frozen_quota"] = gorm.Expr("frozen_quota - ?", amount)
+	} else {
+		updates["frozen_dividend"] = gorm.Expr("frozen_dividend - ?", amount)
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error
+}
+
+// RejectUserWithdraw 提现审核拒绝: 解冻退回可用余额(冻结 -= amount, 可用 += amount)。
+func RejectUserWithdraw(id int, wtype, amount int) error {
+	updates := map[string]interface{}{}
+	if wtype == WithdrawTypePrincipal {
+		updates["quota"] = gorm.Expr("quota + ?", amount)
+		updates["frozen_quota"] = gorm.Expr("frozen_quota - ?", amount)
+	} else {
+		updates["dividend_balance"] = gorm.Expr("dividend_balance + ?", amount)
+		updates["frozen_dividend"] = gorm.Expr("frozen_dividend - ?", amount)
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error
+}
+
 func DeltaUpdateUserQuota(id int, delta int) (err error) {
 	if delta == 0 {
 		return nil

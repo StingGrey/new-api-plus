@@ -122,6 +122,10 @@ func SetApiRouter(router *gin.Engine) {
 				// Custom OAuth bindings
 				selfRoute.GET("/oauth/bindings", controller.GetUserOAuthBindings)
 				selfRoute.DELETE("/oauth/bindings/:provider_id", controller.UnbindCustomOAuth)
+
+				// Withdraw (rebate/dividend system): user apply + list own
+				selfRoute.POST("/withdraw", middleware.CriticalRateLimit(), controller.RequestWithdraw)
+				selfRoute.GET("/withdraw/self", controller.GetUserWithdraws)
 			}
 
 			adminRoute := userRoute.Group("/")
@@ -196,6 +200,15 @@ func SetApiRouter(router *gin.Engine) {
 			optionRoute.POST("/waffo-pancake/save", controller.SaveWaffoPancake)
 			optionRoute.POST("/waffo-pancake/subscription-product", controller.CreateWaffoPancakeSubscriptionProduct)
 			optionRoute.POST("/waffo-pancake/subscription-product-options", controller.ListWaffoPancakeSubscriptionProductOptions)
+		}
+
+		// Withdraw review (root only): rebate/dividend withdrawal approval queue
+		withdrawRoute := apiRouter.Group("/withdraw")
+		withdrawRoute.Use(middleware.RootAuth())
+		{
+			withdrawRoute.GET("/", controller.GetAllWithdraws)
+			withdrawRoute.POST("/approve", controller.ApproveWithdraw)
+			withdrawRoute.POST("/reject", controller.RejectWithdraw)
 		}
 
 		// Custom OAuth provider management (root only)
