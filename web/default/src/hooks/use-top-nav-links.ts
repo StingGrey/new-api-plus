@@ -99,5 +99,11 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('About'), href: '/about' })
   }
 
+  // Tutorial (使用教程, 后台 Markdown 编辑)
+  links.push({ title: t('Tutorial'), href: '/tutorial' })
+
+  // FAQ (常见问题, 从概览迁出)
+  links.push({ title: t('FAQ'), href: '/faq' })
+
   return links
 }
