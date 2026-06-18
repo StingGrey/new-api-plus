@@ -31,6 +31,10 @@ export const createModelPricingSchema = (t: (key: string) => string) =>
     imageRatio: z.string().optional(),
     audioRatio: z.string().optional(),
     audioCompletionRatio: z.string().optional(),
+    // 成本价（平台买入价 $/1M tokens），与售价完全分离，仅超管可写。
+    costInput: z.string().optional(),
+    costOutput: z.string().optional(),
+    costCache: z.string().optional(),
   })
 
 export type ModelPricingFormValues = z.infer<
@@ -60,6 +64,20 @@ export type ModelRatioData = {
   billingMode?: PricingMode
   billingExpr?: string
   requestRuleExpr?: string
+  // 成本价（平台买入价 $/1M tokens），与售价完全分离，仅超管可写。
+  // 编辑态用 string（输入框），序列化时 parseFloat 成 number。
+  costInput?: string
+  costOutput?: string
+  costCache?: string
+}
+
+// 后端 option key "ModelCost" 的 JSON 值结构（嵌套对象 map），对应
+// setting/ratio_setting/model_cost.go 的 ModelCostInfo（float64 $/1M tokens）。
+// 售价是扁平 Record<string, number>，成本是 Record<string, ModelCostInfo>，结构不同，不能混用。
+export type ModelCostInfo = {
+  input_cost_per_m: number
+  output_cost_per_m: number
+  cache_cost_per_m?: number
 }
 
 export type PreviewRow = {
@@ -215,6 +233,25 @@ export function buildPreviewRows(
   laneEnabled: Record<LaneKey, boolean>,
   t: (key: string) => string
 ): PreviewRow[] {
+  // 成本与计费模式无关，所有模式都在预览末尾展示。
+  const costRows: PreviewRow[] = [
+    {
+      key: 'costInput',
+      label: t('Input cost'),
+      value: values.costInput ? `$${values.costInput}` : t('Empty'),
+    },
+    {
+      key: 'costOutput',
+      label: t('Output cost'),
+      value: values.costOutput ? `$${values.costOutput}` : t('Empty'),
+    },
+    {
+      key: 'costCache',
+      label: t('Cache cost'),
+      value: values.costCache ? `$${values.costCache}` : t('Empty'),
+    },
+  ]
+
   if (mode === 'tiered_expr') {
     const effectiveExpr = combineBillingExpr(billingExpr, requestRuleExpr)
     return [
@@ -225,6 +262,7 @@ export function buildPreviewRows(
         value: effectiveExpr || t('Empty'),
         multiline: true,
       },
+      ...costRows,
     ]
   }
 
@@ -235,6 +273,7 @@ export function buildPreviewRows(
         label: 'ModelPrice',
         value: values.price || t('Empty'),
       },
+      ...costRows,
     ]
   }
 
@@ -292,5 +331,6 @@ export function buildPreviewRows(
           ? `$${lanePrices.audioOutput}`
           : t('Empty'),
     },
+    ...costRows,
   ]
 }

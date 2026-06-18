@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DataTableColumnHeader } from '@/components/data-table'
 import { StatusBadge } from '@/components/status-badge'
 import {
+  getCostSummary,
   getModeLabel,
   getModeVariant,
   getPriceDetail,
@@ -139,6 +140,36 @@ export function buildModelRatioColumns({
           getPriceSummary(rowB.original, t)
         ),
       meta: { label: t('Price summary') },
+    },
+    {
+      id: 'cost',
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title={t('Cost')} />
+      ),
+      cell: ({ row }) => {
+        const summary = getCostSummary(row.original)
+        return summary ? (
+          <div className='flex min-w-0 flex-col gap-1'>
+            <span className='truncate font-medium'>{summary}</span>
+            <span className='text-muted-foreground text-xs'>
+              $ / {t('1M tokens')}
+            </span>
+          </div>
+        ) : (
+          <StatusBadge
+            label={t('Not Set')}
+            variant='neutral'
+            size='sm'
+            copyable={false}
+          />
+        )
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = Number(rowA.original.costInput) || 0
+        const b = Number(rowB.original.costInput) || 0
+        return a - b
+      },
+      meta: { label: t('Cost') },
     },
     {
       id: 'actions',

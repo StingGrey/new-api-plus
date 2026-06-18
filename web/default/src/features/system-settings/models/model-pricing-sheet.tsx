@@ -167,6 +167,9 @@ export const ModelPricingEditorPanel = forwardRef<
       imageRatio: '',
       audioRatio: '',
       audioCompletionRatio: '',
+      costInput: '',
+      costOutput: '',
+      costCache: '',
     },
   })
 
@@ -184,6 +187,9 @@ export const ModelPricingEditorPanel = forwardRef<
         imageRatio: editData.imageRatio || '',
         audioRatio: editData.audioRatio || '',
         audioCompletionRatio: editData.audioCompletionRatio || '',
+        costInput: editData.costInput || '',
+        costOutput: editData.costOutput || '',
+        costCache: editData.costCache || '',
       })
       setPricingMode(
         editData.billingMode === 'tiered_expr'
@@ -205,6 +211,9 @@ export const ModelPricingEditorPanel = forwardRef<
         imageRatio: '',
         audioRatio: '',
         audioCompletionRatio: '',
+        costInput: '',
+        costOutput: '',
+        costCache: '',
       })
       setPricingMode('per-token')
       setBillingExpr('')
@@ -221,6 +230,14 @@ export const ModelPricingEditorPanel = forwardRef<
       shouldDirty: true,
       shouldValidate: true,
     })
+  }
+
+  const handleCostChange = (
+    field: 'costInput' | 'costOutput' | 'costCache',
+    value: string
+  ) => {
+    if (!numericDraftRegex.test(value)) return
+    setFormValue(field, value)
   }
 
   const deriveLaneRatio = (
@@ -447,6 +464,9 @@ export const ModelPricingEditorPanel = forwardRef<
         imageRatio: values.imageRatio || '',
         audioRatio: values.audioRatio || '',
         audioCompletionRatio: values.audioCompletionRatio || '',
+        costInput: values.costInput || '',
+        costOutput: values.costOutput || '',
+        costCache: values.costCache || '',
       }
 
       if (pricingMode === 'tiered_expr') {
@@ -534,6 +554,55 @@ export const ModelPricingEditorPanel = forwardRef<
                     </FormItem>
                   )}
                 />
+
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel>{t('Model cost')}</FieldLabel>
+                    <FieldDescription>
+                      {t(
+                        'Platform buy price from upstream, independent from sale price. Used for profit / dividend calculation.'
+                      )}
+                    </FieldDescription>
+                    <div className='grid gap-3 sm:grid-cols-3'>
+                      <div className='flex flex-col gap-1'>
+                        <PriceInput
+                          value={watchedValues.costInput ?? ''}
+                          placeholder='1.5'
+                          onChange={(value) =>
+                            handleCostChange('costInput', value)
+                          }
+                        />
+                        <span className='text-muted-foreground text-xs'>
+                          {t('Input cost per 1M tokens')}
+                        </span>
+                      </div>
+                      <div className='flex flex-col gap-1'>
+                        <PriceInput
+                          value={watchedValues.costOutput ?? ''}
+                          placeholder='6'
+                          onChange={(value) =>
+                            handleCostChange('costOutput', value)
+                          }
+                        />
+                        <span className='text-muted-foreground text-xs'>
+                          {t('Output cost per 1M tokens')}
+                        </span>
+                      </div>
+                      <div className='flex flex-col gap-1'>
+                        <PriceInput
+                          value={watchedValues.costCache ?? ''}
+                          placeholder='0.15'
+                          onChange={(value) =>
+                            handleCostChange('costCache', value)
+                          }
+                        />
+                        <span className='text-muted-foreground text-xs'>
+                          {t('Cache cost per 1M tokens')}
+                        </span>
+                      </div>
+                    </div>
+                  </Field>
+                </FieldGroup>
 
                 <Tabs
                   value={pricingMode}

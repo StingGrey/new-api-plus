@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { splitBillingExprAndRequestRules } from '@/features/pricing/lib/billing-expr'
 import { safeJsonParse } from '../utils/json-parser'
 import { formatPricingNumber } from './pricing-format'
+import { type ModelCostInfo } from './model-pricing-core'
 
 export type ModelPricingSnapshotInput = {
   modelPrice: string
@@ -31,6 +32,7 @@ export type ModelPricingSnapshotInput = {
   audioCompletionRatio: string
   billingMode: string
   billingExpr: string
+  modelCost: string
 }
 
 export type ModelPricingSnapshot = {
@@ -46,6 +48,9 @@ export type ModelPricingSnapshot = {
   billingMode?: string
   billingExpr?: string
   requestRuleExpr?: string
+  costInput?: string
+  costOutput?: string
+  costCache?: string
   hasConflict: boolean
 }
 
@@ -167,6 +172,7 @@ export const buildModelSnapshots = ({
   audioCompletionRatio,
   billingMode,
   billingExpr,
+  modelCost,
 }: ModelPricingSnapshotInput): ModelPricingSnapshot[] => {
   const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
     fallback: {},
@@ -208,6 +214,11 @@ export const buildModelSnapshots = ({
     fallback: {},
     context: 'billing expression',
   })
+  // 成本是嵌套对象 map（Record<string, ModelCostInfo>），与售价的扁平 map 结构不同。
+  const costMap = safeJsonParse<Record<string, ModelCostInfo>>(modelCost, {
+    fallback: {},
+    context: 'model costs',
+  })
 
   const modelNames = new Set([
     ...Object.keys(priceMap),
@@ -220,6 +231,7 @@ export const buildModelSnapshots = ({
     ...Object.keys(audioCompletionMap),
     ...Object.keys(billingModeMap),
     ...Object.keys(billingExprMap),
+    ...Object.keys(costMap),
   ])
 
   return Array.from(modelNames).map((name) => {
@@ -231,6 +243,10 @@ export const buildModelSnapshots = ({
     const image = imageMap[name]?.toString() || ''
     const audio = audioMap[name]?.toString() || ''
     const audioCompletion = audioCompletionMap[name]?.toString() || ''
+    const cost = costMap[name]
+    const costInput = cost?.input_cost_per_m?.toString() || ''
+    const costOutput = cost?.output_cost_per_m?.toString() || ''
+    const costCache = cost?.cache_cost_per_m?.toString() || ''
 
     const modeForModel = billingModeMap[name]
     if (modeForModel === 'tiered_expr') {
@@ -250,6 +266,9 @@ export const buildModelSnapshots = ({
         imageRatio: image,
         audioRatio: audio,
         audioCompletionRatio: audioCompletion,
+        costInput,
+        costOutput,
+        costCache,
         hasConflict: false,
       }
     }
@@ -264,6 +283,9 @@ export const buildModelSnapshots = ({
       imageRatio: image,
       audioRatio: audio,
       audioCompletionRatio: audioCompletion,
+      costInput,
+      costOutput,
+      costCache,
       billingMode: price !== '' ? 'per-request' : 'per-token',
       hasConflict:
         price !== '' &&
@@ -292,5 +314,17 @@ export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
     billingMode: snapshot.billingMode || 'per-token',
     billingExpr: snapshot.billingExpr || '',
     requestRuleExpr: snapshot.requestRuleExpr || '',
+    // 成本必须纳入签名，否则改了成本表格不会标「已改动」。
+    costInput: snapshot.costInput || '',
+    costOutput: snapshot.costOutput || '',
+    costCache: snapshot.costCache || '',
   })
+}
+
+// 表格成本列摘要：有值返回 `$in / $out`（缺项用 — 占位），全空返回 ''（列里显示 Not Set）。
+export const getCostSummary = (row: ModelPricingSnapshot) => {
+  const input = formatPricingNumber(row.costInput)
+  const output = formatPricingNumber(row.costOutput)
+  if (!input && !output) return ''
+  return `${input ? `$${input}` : '—'} / ${output ? `$${output}` : '—'}`
 }
