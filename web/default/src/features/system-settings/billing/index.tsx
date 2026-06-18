@@ -42,6 +42,7 @@ const defaultBillingSettings: BillingSettings = {
   ModelPrice: '',
   ModelRatio: '',
   ModelCost: '',
+  ModelPricingSource: '',
   CacheRatio: '',
   CreateCacheRatio: '',
   CompletionRatio: '',

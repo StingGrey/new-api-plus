@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { splitBillingExprAndRequestRules } from '@/features/pricing/lib/billing-expr'
 import { safeJsonParse } from '../utils/json-parser'
 import { formatPricingNumber } from './pricing-format'
-import { type ModelCostInfo } from './model-pricing-core'
+import { type ModelCostInfo, type ModelPricingSource } from './model-pricing-core'
 
 export type ModelPricingSnapshotInput = {
   modelPrice: string
@@ -33,6 +33,7 @@ export type ModelPricingSnapshotInput = {
   billingMode: string
   billingExpr: string
   modelCost: string
+  modelPricingSource: string
 }
 
 export type ModelPricingSnapshot = {
@@ -51,6 +52,14 @@ export type ModelPricingSnapshot = {
   costInput?: string
   costOutput?: string
   costCache?: string
+  // 倍率定价（multiplier 模式）专用：官方价 + 倍率（从 ModelPricingSource 铺平）。
+  officialInput?: string
+  officialOutput?: string
+  officialCacheRead?: string
+  officialCacheWrite?: string
+  saleMultiplier?: string
+  costMultiplier?: string
+  pricingSource?: 'multiplier'
   hasConflict: boolean
 }
 
@@ -173,6 +182,7 @@ export const buildModelSnapshots = ({
   billingMode,
   billingExpr,
   modelCost,
+  modelPricingSource,
 }: ModelPricingSnapshotInput): ModelPricingSnapshot[] => {
   const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
     fallback: {},
@@ -219,6 +229,11 @@ export const buildModelSnapshots = ({
     fallback: {},
     context: 'model costs',
   })
+  // 倍率定价来源（官方价+倍率），嵌套对象 map，仅供 UI 还原。
+  const pricingSourceMap = safeJsonParse<Record<string, ModelPricingSource>>(
+    modelPricingSource,
+    { fallback: {}, context: 'model pricing sources' }
+  )
 
   const modelNames = new Set([
     ...Object.keys(priceMap),
@@ -232,6 +247,7 @@ export const buildModelSnapshots = ({
     ...Object.keys(billingModeMap),
     ...Object.keys(billingExprMap),
     ...Object.keys(costMap),
+    ...Object.keys(pricingSourceMap),
   ])
 
   return Array.from(modelNames).map((name) => {
@@ -247,6 +263,14 @@ export const buildModelSnapshots = ({
     const costInput = cost?.input_cost_per_m?.toString() || ''
     const costOutput = cost?.output_cost_per_m?.toString() || ''
     const costCache = cost?.cache_cost_per_m?.toString() || ''
+    const source = pricingSourceMap[name]
+    const officialInput = source?.official_input?.toString() || ''
+    const officialOutput = source?.official_output?.toString() || ''
+    const officialCacheRead = source?.official_cache_read?.toString() || ''
+    const officialCacheWrite = source?.official_cache_write?.toString() || ''
+    const saleMultiplier = source?.sale_multiplier?.toString() || ''
+    const costMultiplier = source?.cost_multiplier?.toString() || ''
+    const pricingSource = source ? 'multiplier' : undefined
 
     const modeForModel = billingModeMap[name]
     if (modeForModel === 'tiered_expr') {
@@ -269,6 +293,13 @@ export const buildModelSnapshots = ({
         costInput,
         costOutput,
         costCache,
+        officialInput,
+        officialOutput,
+        officialCacheRead,
+        officialCacheWrite,
+        saleMultiplier,
+        costMultiplier,
+        pricingSource,
         hasConflict: false,
       }
     }
@@ -286,6 +317,13 @@ export const buildModelSnapshots = ({
       costInput,
       costOutput,
       costCache,
+      officialInput,
+      officialOutput,
+      officialCacheRead,
+      officialCacheWrite,
+      saleMultiplier,
+      costMultiplier,
+      pricingSource,
       billingMode: price !== '' ? 'per-request' : 'per-token',
       hasConflict:
         price !== '' &&
@@ -318,6 +356,9 @@ export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
     costInput: snapshot.costInput || '',
     costOutput: snapshot.costOutput || '',
     costCache: snapshot.costCache || '',
+    // pricingSource 标记纳入（从 per-token 切到 multiplier 保存后标 changed）。
+    // 不纳入派生的 officialInput 等（它们由 ratio 派生，纳入会双重计数）。
+    pricingSource: snapshot.pricingSource || '',
   })
 }
 

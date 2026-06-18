@@ -46,6 +46,7 @@ type ModelFormValues = {
   ModelPrice: string
   ModelRatio: string
   ModelCost: string
+  ModelPricingSource: string
   CacheRatio: string
   CreateCacheRatio: string
   CompletionRatio: string
@@ -70,6 +71,7 @@ type ModelJsonFieldName =
   | 'ModelPrice'
   | 'ModelRatio'
   | 'ModelCost'
+  | 'ModelPricingSource'
   | 'CacheRatio'
   | 'CreateCacheRatio'
   | 'CompletionRatio'
@@ -98,6 +100,12 @@ const modelJsonFields: Array<{
     labelKey: 'Model cost',
     descriptionKey:
       'JSON map of model → { input_cost_per_m, output_cost_per_m, cache_cost_per_m } in USD per 1M tokens. Platform buy price from upstream (e.g. krill). Super admin only; used for profit / dividend calculation, independent from sale price.',
+  },
+  {
+    name: 'ModelPricingSource',
+    labelKey: 'Model pricing source',
+    descriptionKey:
+      'JSON map of model → { official_input, official_output, official_cache_read, official_cache_write, sale_multiplier, cost_multiplier } in USD/1M. UI source for multiplier pricing mode; not read by billing engine (billing uses ModelRatio/ModelCost).',
   },
   {
     name: 'CacheRatio',
@@ -253,6 +261,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               savedBillingMode={savedValues.BillingMode}
               savedBillingExpr={savedValues.BillingExpr}
               savedModelCost={savedValues.ModelCost}
+              savedModelPricingSource={savedValues.ModelPricingSource}
               modelPrice={form.watch('ModelPrice')}
               modelRatio={form.watch('ModelRatio')}
               cacheRatio={form.watch('CacheRatio')}
@@ -264,6 +273,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
               modelCost={form.watch('ModelCost')}
+              modelPricingSource={form.watch('ModelPricingSource')}
               onSave={handleSave}
               isSaving={isSaving}
               onChange={(field, value) => {

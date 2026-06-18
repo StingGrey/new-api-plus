@@ -35,13 +35,20 @@ export const createModelPricingSchema = (t: (key: string) => string) =>
     costInput: z.string().optional(),
     costOutput: z.string().optional(),
     costCache: z.string().optional(),
+    // 倍率定价模式（multiplier）：官方价 + 销售/成本倍率，提交时换算成上面的 ratio/cost。
+    officialInput: z.string().optional(),
+    officialOutput: z.string().optional(),
+    officialCacheRead: z.string().optional(),
+    officialCacheWrite: z.string().optional(),
+    saleMultiplier: z.string().optional(),
+    costMultiplier: z.string().optional(),
   })
 
 export type ModelPricingFormValues = z.infer<
   ReturnType<typeof createModelPricingSchema>
 >
 
-export type PricingMode = 'per-token' | 'per-request' | 'tiered_expr'
+export type PricingMode = 'per-token' | 'per-request' | 'tiered_expr' | 'multiplier'
 
 export type LaneKey =
   | 'completion'
@@ -69,6 +76,14 @@ export type ModelRatioData = {
   costInput?: string
   costOutput?: string
   costCache?: string
+  // 倍率定价模式（multiplier）专用：官方价 $/1M + 销售/成本倍率（编辑态 string）。
+  // 仅 multiplier 模式填充；提交时 convertMultiplierToRatioData 换算成上面的 ratio/cost。
+  officialInput?: string
+  officialOutput?: string
+  officialCacheRead?: string
+  officialCacheWrite?: string
+  saleMultiplier?: string
+  costMultiplier?: string
 }
 
 // 后端 option key "ModelCost" 的 JSON 值结构（嵌套对象 map），对应
@@ -78,6 +93,19 @@ export type ModelCostInfo = {
   input_cost_per_m: number
   output_cost_per_m: number
   cache_cost_per_m?: number
+}
+
+// 后端 option key "ModelPricingSource" 的 JSON 值结构（嵌套对象 map），对应
+// setting/ratio_setting/model_pricing_source.go 的 ModelPricingSource。
+// 倍率定价模式的编辑态来源：官方价(4项 $/1M) + 销售倍率 + 成本倍率。
+// 仅用于前端 UI 还原，计费引擎不读（计费仍走 ModelRatio/ModelCost）。
+export type ModelPricingSource = {
+  official_input: number
+  official_output: number
+  official_cache_read: number
+  official_cache_write: number
+  sale_multiplier: number
+  cost_multiplier: number
 }
 
 export type PreviewRow = {
@@ -223,6 +251,128 @@ export function createInitialLaneState(data?: ModelRatioData | null) {
   }
 }
 
+// multiplier 模式编辑态（官方价 + 倍率），由 createInitialMultiplierState 从 ModelRatioData 还原。
+export type MultiplierLaneState = {
+  officialPrices: {
+    input: string
+    output: string
+    cacheRead: string
+    cacheWrite: string
+  }
+  saleMultiplier: string
+  costMultiplier: string
+  isApproximate: boolean
+}
+
+// multiplier 模式 → 现有 ratio/cost 正向换算（提交时用）。返回值填进 ModelRatioData 落盘。
+// 公式: ModelRatio = official_input × sale_multiplier / 2 (USD=500, ratio×2=$/1M);
+//       CompletionRatio = official_output/official_input 等(lane 相对 input 的倍数);
+//       ModelCost = 官方价 × cost_multiplier (绝对 $/1M)。
+export function convertMultiplierToRatioData(
+  data: ModelRatioData
+): Partial<ModelRatioData> {
+  const officialInput = toNumberOrNull(data.officialInput)
+  const officialOutput = toNumberOrNull(data.officialOutput)
+  const officialCacheRead = toNumberOrNull(data.officialCacheRead)
+  const officialCacheWrite = toNumberOrNull(data.officialCacheWrite)
+  const saleMul = toNumberOrNull(data.saleMultiplier)
+  const costMul = toNumberOrNull(data.costMultiplier)
+  const result: Partial<ModelRatioData> = {}
+
+  if (officialInput === null || officialInput <= 0) return result
+
+  result.ratio = formatPricingNumber((officialInput * (saleMul ?? 1)) / 2)
+  if (officialOutput !== null) {
+    result.completionRatio = formatPricingNumber(officialOutput / officialInput)
+  }
+  if (officialCacheRead !== null) {
+    result.cacheRatio = formatPricingNumber(officialCacheRead / officialInput)
+  }
+  if (officialCacheWrite !== null) {
+    result.createCacheRatio = formatPricingNumber(
+      officialCacheWrite / officialInput
+    )
+  }
+  if (costMul !== null) {
+    result.costInput = formatPricingNumber(officialInput * costMul)
+    if (officialOutput !== null) {
+      result.costOutput = formatPricingNumber(officialOutput * costMul)
+    }
+    if (officialCacheRead !== null) {
+      result.costCache = formatPricingNumber(officialCacheRead * costMul)
+    }
+  }
+  return result
+}
+
+// 从 ModelRatioData 还原 multiplier 编辑态。优先从 officialInput 等精确还原;
+// 老数据(无 officialInput)从 ratio 近似反推(saleMul≈1), 标 isApproximate。
+export function createInitialMultiplierState(
+  data?: ModelRatioData | null
+): MultiplierLaneState {
+  const empty = { input: '', output: '', cacheRead: '', cacheWrite: '' }
+  if (!data) {
+    return {
+      officialPrices: empty,
+      saleMultiplier: '',
+      costMultiplier: '',
+      isApproximate: false,
+    }
+  }
+
+  if (hasValue(data.officialInput)) {
+    return {
+      officialPrices: {
+        input: data.officialInput || '',
+        output: data.officialOutput || '',
+        cacheRead: data.officialCacheRead || '',
+        cacheWrite: data.officialCacheWrite || '',
+      },
+      saleMultiplier: data.saleMultiplier || '',
+      costMultiplier: data.costMultiplier || '',
+      isApproximate: false,
+    }
+  }
+
+  const ratioNum = toNumberOrNull(data.ratio)
+  if (ratioNum === null || ratioNum <= 0) {
+    return {
+      officialPrices: empty,
+      saleMultiplier: '',
+      costMultiplier: '',
+      isApproximate: false,
+    }
+  }
+  const officialInput = ratioNum * 2
+  const completionRatio = toNumberOrNull(data.completionRatio)
+  const cacheRatio = toNumberOrNull(data.cacheRatio)
+  const createCacheRatio = toNumberOrNull(data.createCacheRatio)
+  const costInputNum = toNumberOrNull(data.costInput)
+  return {
+    officialPrices: {
+      input: formatPricingNumber(officialInput),
+      output:
+        completionRatio !== null
+          ? formatPricingNumber(completionRatio * officialInput)
+          : '',
+      cacheRead:
+        cacheRatio !== null
+          ? formatPricingNumber(cacheRatio * officialInput)
+          : '',
+      cacheWrite:
+        createCacheRatio !== null
+          ? formatPricingNumber(createCacheRatio * officialInput)
+          : '',
+    },
+    saleMultiplier: '1',
+    costMultiplier:
+      costInputNum !== null && costInputNum > 0
+        ? formatPricingNumber(costInputNum / officialInput)
+        : '',
+    isApproximate: true,
+  }
+}
+
 export function buildPreviewRows(
   values: ModelPricingFormValues,
   mode: PricingMode,
@@ -251,6 +401,69 @@ export function buildPreviewRows(
       value: values.costCache ? `$${values.costCache}` : t('Empty'),
     },
   ]
+
+  if (mode === 'multiplier') {
+    const officialInput = toNumberOrNull(values.officialInput)
+    const officialOutput = toNumberOrNull(values.officialOutput)
+    const officialCacheRead = toNumberOrNull(values.officialCacheRead)
+    const officialCacheWrite = toNumberOrNull(values.officialCacheWrite)
+    const saleMul = toNumberOrNull(values.saleMultiplier)
+    const costMul = toNumberOrNull(values.costMultiplier)
+    const mul = (n: number | null) =>
+      n !== null ? `$${formatPricingNumber(n)}` : t('Empty')
+    return [
+      {
+        key: 'officialInput',
+        label: t('Official input price'),
+        value: mul(officialInput),
+      },
+      {
+        key: 'officialOutput',
+        label: t('Official output price'),
+        value: mul(officialOutput),
+      },
+      {
+        key: 'officialCacheRead',
+        label: t('Official cache read'),
+        value: mul(officialCacheRead),
+      },
+      {
+        key: 'officialCacheWrite',
+        label: t('Official cache write'),
+        value: mul(officialCacheWrite),
+      },
+      {
+        key: 'saleMul',
+        label: t('Sale multiplier'),
+        value:
+          saleMul !== null ? `×${formatPricingNumber(saleMul)}` : t('Empty'),
+      },
+      {
+        key: 'costMul',
+        label: t('Cost multiplier'),
+        value:
+          costMul !== null ? `×${formatPricingNumber(costMul)}` : t('Empty'),
+      },
+      ...(officialInput !== null && saleMul !== null
+        ? [
+            {
+              key: 'saleInput',
+              label: t('Sale input'),
+              value: `$${formatPricingNumber(officialInput * saleMul)}`,
+            },
+          ]
+        : []),
+      ...(officialInput !== null && costMul !== null
+        ? [
+            {
+              key: 'costInputMul',
+              label: t('Cost input'),
+              value: `$${formatPricingNumber(officialInput * costMul)}`,
+            },
+          ]
+        : []),
+    ]
+  }
 
   if (mode === 'tiered_expr') {
     const effectiveExpr = combineBillingExpr(billingExpr, requestRuleExpr)

@@ -46,6 +46,7 @@ const defaultModelSettings: ModelSettings = {
   ModelPrice: '',
   ModelRatio: '',
   ModelCost: '',
+  ModelPricingSource: '',
   CacheRatio: '',
   CreateCacheRatio: '',
   CompletionRatio: '',

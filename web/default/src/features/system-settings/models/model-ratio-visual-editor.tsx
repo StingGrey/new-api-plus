@@ -61,7 +61,7 @@ import {
   type ModelRow,
 } from './model-pricing-snapshots'
 import { buildModelRatioColumns } from './model-ratio-table-columns'
-import { type ModelCostInfo } from './model-pricing-core'
+import { type ModelCostInfo, type ModelPricingSource } from './model-pricing-core'
 
 type ModelRatioVisualEditorProps = {
   savedModelPrice: string
@@ -75,6 +75,7 @@ type ModelRatioVisualEditorProps = {
   savedBillingMode: string
   savedBillingExpr: string
   savedModelCost: string
+  savedModelPricingSource: string
   modelPrice: string
   modelRatio: string
   cacheRatio: string
@@ -86,6 +87,7 @@ type ModelRatioVisualEditorProps = {
   billingMode: string
   billingExpr: string
   modelCost: string
+  modelPricingSource: string
   onChange: (field: string, value: string) => void
   onSave: () => void | Promise<void>
   isSaving: boolean
@@ -113,6 +115,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedBillingMode,
     savedBillingExpr,
     savedModelCost,
+    savedModelPricingSource,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -124,6 +127,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingMode,
     billingExpr,
     modelCost,
+    modelPricingSource,
     onChange,
     onSave,
     isSaving,
@@ -199,6 +203,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode: savedBillingMode,
       billingExpr: savedBillingExpr,
       modelCost: savedModelCost,
+      modelPricingSource: savedModelPricingSource,
     })
     const draftRows = buildModelSnapshots({
       modelPrice,
@@ -212,6 +217,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       modelCost,
+      modelPricingSource,
     })
 
     const savedByName = new Map(savedRows.map((row) => [row.name, row]))
@@ -248,6 +254,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedBillingMode,
     savedBillingExpr,
     savedModelCost,
+    savedModelPricingSource,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -259,6 +266,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingMode,
     billingExpr,
     modelCost,
+    modelPricingSource,
   ])
 
   const modeCounts = useMemo(
@@ -306,6 +314,12 @@ const ModelRatioVisualEditorComponent = forwardRef<
         costInput: editableModel.costInput,
         costOutput: editableModel.costOutput,
         costCache: editableModel.costCache,
+        officialInput: editableModel.officialInput,
+        officialOutput: editableModel.officialOutput,
+        officialCacheRead: editableModel.officialCacheRead,
+        officialCacheWrite: editableModel.officialCacheWrite,
+        saleMultiplier: editableModel.saleMultiplier,
+        costMultiplier: editableModel.costMultiplier,
       })
       setEditorOpen(true)
       if (isMobile) setSheetOpen(true)
@@ -380,6 +394,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
         fallback: {},
         silent: true,
       })
+      const pricingSourceMap = safeJsonParse<
+        Record<string, ModelPricingSource>
+      >(modelPricingSource, { fallback: {}, silent: true })
 
       delete priceMap[name]
       delete ratioMap[name]
@@ -392,6 +409,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       delete billingModeMap[name]
       delete billingExprMap[name]
       delete costMap[name]
+      delete pricingSourceMap[name]
 
       onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
       onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
@@ -413,6 +431,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
         JSON.stringify(billingExprMap, null, 2)
       )
       onChange('ModelCost', JSON.stringify(costMap, null, 2))
+      onChange(
+        'ModelPricingSource',
+        JSON.stringify(pricingSourceMap, null, 2)
+      )
     },
     [
       modelPrice,
@@ -426,6 +448,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       modelCost,
+      modelPricingSource,
       onChange,
     ]
   )
@@ -509,6 +532,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
         fallback: {},
         silent: true,
       })
+      const pricingSourceMap = safeJsonParse<
+        Record<string, ModelPricingSource>
+      >(modelPricingSource, { fallback: {}, silent: true })
 
       const setIfPresent = (
         target: Record<string, number>,
@@ -532,6 +558,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         delete billingModeMap[name]
         delete billingExprMap[name]
         delete costMap[name]
+        delete pricingSourceMap[name]
 
         if (data.billingMode === 'tiered_expr') {
           const combined = combineBillingExpr(
@@ -587,6 +614,21 @@ const ModelRatioVisualEditorComponent = forwardRef<
               : {}),
           }
         }
+
+        // multiplier 模式：写官方价+倍率到 pricingSourceMap（UI 还原用，不计费）。
+        const officialInputNum = parseFloat(data.officialInput || '')
+        if (Number.isFinite(officialInputNum) && officialInputNum > 0) {
+          pricingSourceMap[name] = {
+            official_input: officialInputNum,
+            official_output: parseFloat(data.officialOutput || '') || 0,
+            official_cache_read:
+              parseFloat(data.officialCacheRead || '') || 0,
+            official_cache_write:
+              parseFloat(data.officialCacheWrite || '') || 0,
+            sale_multiplier: parseFloat(data.saleMultiplier || '') || 0,
+            cost_multiplier: parseFloat(data.costMultiplier || '') || 0,
+          }
+        }
       })
 
       onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
@@ -609,6 +651,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
         JSON.stringify(billingExprMap, null, 2)
       )
       onChange('ModelCost', JSON.stringify(costMap, null, 2))
+      onChange(
+        'ModelPricingSource',
+        JSON.stringify(pricingSourceMap, null, 2)
+      )
     },
     [
       modelPrice,
@@ -622,6 +668,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       modelCost,
+      modelPricingSource,
       onChange,
     ]
   )
@@ -834,6 +881,8 @@ export const ModelRatioVisualEditor = memo(
       prevProps.billingExpr === nextProps.billingExpr &&
       prevProps.modelCost === nextProps.modelCost &&
       prevProps.savedModelCost === nextProps.savedModelCost &&
+      prevProps.modelPricingSource === nextProps.modelPricingSource &&
+      prevProps.savedModelPricingSource === nextProps.savedModelPricingSource &&
       prevProps.onChange === nextProps.onChange &&
       prevProps.onSave === nextProps.onSave &&
       prevProps.isSaving === nextProps.isSaving

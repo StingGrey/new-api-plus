@@ -65,7 +65,9 @@ import {
   EMPTY_LANE_ENABLED,
   EMPTY_LANE_PRICES,
   buildPreviewRows,
+  convertMultiplierToRatioData,
   createInitialLaneState,
+  createInitialMultiplierState,
   createModelPricingSchema,
   hasValue,
   laneConfigs,
@@ -75,6 +77,7 @@ import {
   type LaneKey,
   type ModelPricingFormValues,
   type ModelRatioData,
+  type MultiplierLaneState,
   type PricingMode,
 } from './model-pricing-core'
 import { PriceInput, PriceLane } from './model-pricing-inputs'
@@ -153,6 +156,9 @@ export const ModelPricingEditorPanel = forwardRef<
   })
   const [billingExpr, setBillingExpr] = useState('')
   const [requestRuleExpr, setRequestRuleExpr] = useState('')
+  const [mulState, setMulState] = useState<MultiplierLaneState>(
+    createInitialMultiplierState(null)
+  )
   const isEditMode = !!editData
 
   const form = useForm<ModelPricingFormValues>({
@@ -223,6 +229,7 @@ export const ModelPricingEditorPanel = forwardRef<
     setPromptPrice(nextLaneState.promptPrice)
     setLanePrices(nextLaneState.prices)
     setLaneEnabled(nextLaneState.enabled)
+    setMulState(createInitialMultiplierState(editData))
   }, [editData, form])
 
   const setFormValue = (field: keyof ModelPricingFormValues, value: string) => {
@@ -238,6 +245,28 @@ export const ModelPricingEditorPanel = forwardRef<
   ) => {
     if (!numericDraftRegex.test(value)) return
     setFormValue(field, value)
+  }
+
+  const handleOfficialPriceChange = (
+    field: 'input' | 'output' | 'cacheRead' | 'cacheWrite',
+    value: string
+  ) => {
+    if (!numericDraftRegex.test(value)) return
+    setMulState((prev) => ({
+      ...prev,
+      officialPrices: { ...prev.officialPrices, [field]: value },
+    }))
+  }
+
+  const handleMultiplierChange = (
+    kind: 'sale' | 'cost',
+    value: string
+  ) => {
+    if (!numericDraftRegex.test(value)) return
+    setMulState((prev) => ({
+      ...prev,
+      [kind === 'sale' ? 'saleMultiplier' : 'costMultiplier']: value,
+    }))
   }
 
   const deriveLaneRatio = (
@@ -413,6 +442,16 @@ export const ModelPricingEditorPanel = forwardRef<
     }
 
     if (
+      pricingMode === 'multiplier' &&
+      (toNumberOrNull(mulState.officialPrices.input) === null ||
+        (toNumberOrNull(mulState.officialPrices.input) ?? 0) <= 0)
+    ) {
+      nextWarnings.push(
+        t('Official input price is required for multiplier pricing.')
+      )
+    }
+
+    if (
       pricingMode === 'per-token' &&
       laneEnabled.audioOutput &&
       !hasValue(lanePrices.audioInput)
@@ -421,9 +460,15 @@ export const ModelPricingEditorPanel = forwardRef<
     }
 
     return nextWarnings
-  }, [editData, laneEnabled, lanePrices, pricingMode, promptPrice, t])
+  }, [editData, laneEnabled, lanePrices, mulState, pricingMode, promptPrice, t])
 
   const validatePricingValues = useCallback(() => {
+    if (pricingMode === 'multiplier') {
+      const officialInput = toNumberOrNull(mulState.officialPrices.input)
+      if (officialInput === null || officialInput <= 0) {
+        return false
+      }
+    }
     if (
       pricingMode === 'per-token' &&
       toNumberOrNull(promptPrice) === null &&
@@ -449,10 +494,24 @@ export const ModelPricingEditorPanel = forwardRef<
     }
 
     return true
-  }, [form, laneEnabled, lanePrices, pricingMode, promptPrice, t])
+  }, [form, laneEnabled, lanePrices, mulState, pricingMode, promptPrice, t])
 
   const buildSubmitData = useCallback(
     (values: ModelPricingFormValues) => {
+      if (pricingMode === 'multiplier') {
+        const mulData: ModelRatioData = {
+          name: values.name.trim(),
+          billingMode: 'per-token',
+          officialInput: mulState.officialPrices.input,
+          officialOutput: mulState.officialPrices.output,
+          officialCacheRead: mulState.officialPrices.cacheRead,
+          officialCacheWrite: mulState.officialPrices.cacheWrite,
+          saleMultiplier: mulState.saleMultiplier,
+          costMultiplier: mulState.costMultiplier,
+        }
+        Object.assign(mulData, convertMultiplierToRatioData(mulData))
+        return mulData
+      }
       const data: ModelRatioData = {
         name: values.name.trim(),
         billingMode: pricingMode,
@@ -476,7 +535,7 @@ export const ModelPricingEditorPanel = forwardRef<
 
       return data
     },
-    [billingExpr, pricingMode, requestRuleExpr]
+    [billingExpr, mulState, pricingMode, requestRuleExpr]
   )
 
   useImperativeHandle(
@@ -555,6 +614,7 @@ export const ModelPricingEditorPanel = forwardRef<
                   )}
                 />
 
+                {pricingMode !== 'multiplier' && (
                 <FieldGroup>
                   <Field>
                     <FieldLabel>{t('Model cost')}</FieldLabel>
@@ -603,13 +663,14 @@ export const ModelPricingEditorPanel = forwardRef<
                     </div>
                   </Field>
                 </FieldGroup>
+                )}
 
                 <Tabs
                   value={pricingMode}
                   onValueChange={handleModeChange}
                   className='gap-4'
                 >
-                  <TabsList className='grid w-full grid-cols-3'>
+                  <TabsList className='grid w-full grid-cols-4'>
                     <TabsTrigger value='per-token'>
                       {t('Per-token')}
                     </TabsTrigger>
@@ -619,7 +680,129 @@ export const ModelPricingEditorPanel = forwardRef<
                     <TabsTrigger value='tiered_expr'>
                       {t('Expression')}
                     </TabsTrigger>
+                    <TabsTrigger value='multiplier'>
+                      {t('Multiplier')}
+                    </TabsTrigger>
                   </TabsList>
+
+                  <TabsContent value='multiplier' className='pt-0'>
+                    <FieldGroup className='gap-5'>
+                      <Field>
+                        <FieldLabel>
+                          {t('Official price (from provider)')}
+                        </FieldLabel>
+                        <FieldDescription>
+                          {t(
+                            'Set official $/1M prices once, then sale/cost multipliers auto-compute everything.'
+                          )}
+                        </FieldDescription>
+                        <div className='grid gap-3 sm:grid-cols-2'>
+                          <div className='flex flex-col gap-1'>
+                            <PriceInput
+                              value={mulState.officialPrices.input}
+                              placeholder='5'
+                              onChange={(v) =>
+                                handleOfficialPriceChange('input', v)
+                              }
+                            />
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Official input price')}
+                            </span>
+                          </div>
+                          <div className='flex flex-col gap-1'>
+                            <PriceInput
+                              value={mulState.officialPrices.output}
+                              placeholder='15'
+                              onChange={(v) =>
+                                handleOfficialPriceChange('output', v)
+                              }
+                            />
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Official output price')}
+                            </span>
+                          </div>
+                          <div className='flex flex-col gap-1'>
+                            <PriceInput
+                              value={mulState.officialPrices.cacheRead}
+                              placeholder='0.5'
+                              onChange={(v) =>
+                                handleOfficialPriceChange('cacheRead', v)
+                              }
+                            />
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Official cache read')}
+                            </span>
+                          </div>
+                          <div className='flex flex-col gap-1'>
+                            <PriceInput
+                              value={mulState.officialPrices.cacheWrite}
+                              placeholder='3.75'
+                              onChange={(v) =>
+                                handleOfficialPriceChange('cacheWrite', v)
+                              }
+                            />
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Official cache write')}
+                            </span>
+                          </div>
+                        </div>
+                      </Field>
+
+                      <Field>
+                        <FieldLabel>{t('Multipliers')}</FieldLabel>
+                        <div className='grid gap-3 sm:grid-cols-2'>
+                          <div className='flex flex-col gap-1'>
+                            <InputGroup>
+                              <InputGroupAddon>×</InputGroupAddon>
+                              <InputGroupInput
+                                inputMode='decimal'
+                                placeholder='0.35'
+                                value={mulState.saleMultiplier}
+                                onChange={(e) =>
+                                  handleMultiplierChange('sale', e.target.value)
+                                }
+                              />
+                            </InputGroup>
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Sale multiplier')} ({t('sale = official × multiplier')})
+                            </span>
+                          </div>
+                          <div className='flex flex-col gap-1'>
+                            <InputGroup>
+                              <InputGroupAddon>×</InputGroupAddon>
+                              <InputGroupInput
+                                inputMode='decimal'
+                                placeholder='0.18'
+                                value={mulState.costMultiplier}
+                                onChange={(e) =>
+                                  handleMultiplierChange('cost', e.target.value)
+                                }
+                              />
+                            </InputGroup>
+                            <span className='text-muted-foreground text-xs'>
+                              {t('Cost multiplier')} ({t('cost = official × multiplier')})
+                            </span>
+                          </div>
+                        </div>
+                        <FieldDescription>
+                          {t(
+                            'e.g. official input $5 × sale 0.35 = sale $1.75/1M; × cost 0.18 = cost $0.9/1M.'
+                          )}
+                        </FieldDescription>
+                      </Field>
+
+                      {mulState.isApproximate && (
+                        <Alert>
+                          <AlertTriangle data-icon='inline-start' />
+                          <AlertDescription>
+                            {t(
+                              'Approximate — official price inferred from existing ratio. Save to lock in multipliers.'
+                            )}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </FieldGroup>
+                  </TabsContent>
 
                   <TabsContent value='per-token' className='pt-0'>
                     <FieldGroup className='gap-5'>

@@ -158,6 +158,7 @@ export type ModelSettings = {
   ModelPrice: string
   ModelRatio: string
   ModelCost: string
+  ModelPricingSource: string
   CacheRatio: string
   CreateCacheRatio: string
   CompletionRatio: string
@@ -203,6 +204,7 @@ export type BillingSettings = {
   ModelPrice: string
   ModelRatio: string
   ModelCost: string
+  ModelPricingSource: string
   CacheRatio: string
   CreateCacheRatio: string
   CompletionRatio: string

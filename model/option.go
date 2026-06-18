@@ -143,6 +143,7 @@ func InitOptionMap() {
 	common.OptionMap["ModelRatio"] = ratio_setting.ModelRatio2JSONString()
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
 	common.OptionMap["ModelCost"] = ratio_setting.ModelCost2JSONString()
+	common.OptionMap["ModelPricingSource"] = ratio_setting.ModelPricingSource2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
@@ -532,6 +533,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateModelRatioByJSONString(value)
 	case "ModelCost":
 		err = ratio_setting.UpdateModelCostByJSONString(value)
+	case "ModelPricingSource":
+		err = ratio_setting.UpdateModelPricingSourceByJSONString(value)
 	case "GroupRatio":
 		err = ratio_setting.UpdateGroupRatioByJSONString(value)
 	case "GroupGroupRatio":
