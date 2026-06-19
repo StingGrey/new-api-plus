@@ -242,6 +242,14 @@ export interface UserWalletData {
   aff_count: number
   /** User group */
   group: string
+  /** Gift quota balance (referral rewards / checkin / redemption codes, not withdrawable) */
+  gift_quota?: number
+  /** Total used gift quota */
+  used_gift_quota?: number
+  /** Dividend balance (admin/root only, withdrawable) */
+  dividend_balance?: number
+  /** Cumulative dividends earned (admin/root only, ever-increasing) */
+  dividend_total?: number
 }
 
 /**

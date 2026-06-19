@@ -21,7 +21,10 @@ import { useTranslation } from 'react-i18next'
 import { getSelf } from '@/lib/api'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { Button } from '@/components/ui/button'
 import { SectionPageLayout } from '@/components/layout'
+import { WithdrawRequestSheet } from '@/features/withdraw/components/withdraw-request-sheet'
+import { WITHDRAW_TYPE } from '@/features/withdraw/types'
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
@@ -73,6 +76,7 @@ export function Wallet(props: WalletProps) {
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
   const [showSubscriptionPanel, setShowSubscriptionPanel] = useState(true)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
@@ -265,6 +269,16 @@ export function Wallet(props: WalletProps) {
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
             <WalletStatsCard user={user} loading={userLoading} />
 
+            <div className='flex justify-end'>
+              <Button
+                variant='outline'
+                onClick={() => setWithdrawOpen(true)}
+                disabled={userLoading || !user || user.quota <= 0}
+              >
+                {t('Withdraw')}
+              </Button>
+            </div>
+
             <div
               className={
                 showSubscriptionPanel
@@ -351,6 +365,14 @@ export function Wallet(props: WalletProps) {
       <BillingHistoryDialog
         open={billingDialogOpen}
         onOpenChange={setBillingDialogOpen}
+      />
+
+      <WithdrawRequestSheet
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        type={WITHDRAW_TYPE.PRINCIPAL}
+        maxAmount={user?.quota ?? 0}
+        onSuccess={fetchUser}
       />
 
       <CreemConfirmDialog

@@ -18,10 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   Activity,
+  BarChart3,
   Box,
   CreditCard,
+  Crown,
   FileText,
   FlaskConical,
+  HandCoins,
   Key,
   LayoutDashboard,
   ListTodo,
@@ -34,7 +37,9 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { type SidebarData } from '@/components/layout/types'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE } from '@/lib/roles'
+import { type NavItem, type SidebarData } from '@/components/layout/types'
 
 /**
  * Root navigation groups for the application sidebar.
@@ -44,6 +49,79 @@ import { type SidebarData } from '@/components/layout/types'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const { auth } = useAuthStore()
+  const isAdmin = (auth.user?.role ?? 0) >= ROLE.ADMIN
+  const isRoot = (auth.user?.role ?? 0) >= ROLE.SUPER_ADMIN
+
+  // Dividend account (personal, but admin+ only).
+  const personalItems: NavItem[] = [
+    {
+      title: t('Wallet'),
+      url: '/wallet',
+      icon: Wallet,
+    },
+    {
+      title: t('Profile'),
+      url: '/profile',
+      icon: User,
+    },
+  ]
+  if (isAdmin) {
+    personalItems.push({
+      title: t('Dividend Account'),
+      url: '/dividend',
+      icon: Crown,
+    })
+  }
+
+  // Profit dashboard + withdrawal review (super-admin only).
+  const adminItems: NavItem[] = [
+    {
+      title: t('Channels'),
+      url: '/channels',
+      icon: Radio,
+    },
+    {
+      title: t('Models'),
+      url: '/models/metadata',
+      icon: Box,
+    },
+    {
+      title: t('Users'),
+      url: '/users',
+      icon: Users,
+    },
+    {
+      title: t('Redemption Codes'),
+      url: '/redemption-codes',
+      icon: Ticket,
+    },
+    {
+      title: t('Subscription Management'),
+      url: '/subscriptions',
+      icon: CreditCard,
+    },
+    {
+      title: t('System Settings'),
+      url: '/system-settings/site',
+      activeUrls: ['/system-settings'],
+      icon: Settings,
+    },
+  ]
+  if (isRoot) {
+    adminItems.push(
+      {
+        title: t('Withdrawal Review'),
+        url: '/withdraw-review',
+        icon: HandCoins,
+      },
+      {
+        title: t('Profit Dashboard'),
+        url: '/profit',
+        icon: BarChart3,
+      }
+    )
+  }
 
   return {
     navGroups: [
@@ -99,55 +177,12 @@ export function useSidebarData(): SidebarData {
       {
         id: 'personal',
         title: t('Personal'),
-        items: [
-          {
-            title: t('Wallet'),
-            url: '/wallet',
-            icon: Wallet,
-          },
-          {
-            title: t('Profile'),
-            url: '/profile',
-            icon: User,
-          },
-        ],
+        items: personalItems,
       },
       {
         id: 'admin',
         title: t('Admin'),
-        items: [
-          {
-            title: t('Channels'),
-            url: '/channels',
-            icon: Radio,
-          },
-          {
-            title: t('Models'),
-            url: '/models/metadata',
-            icon: Box,
-          },
-          {
-            title: t('Users'),
-            url: '/users',
-            icon: Users,
-          },
-          {
-            title: t('Redemption Codes'),
-            url: '/redemption-codes',
-            icon: Ticket,
-          },
-          {
-            title: t('Subscription Management'),
-            url: '/subscriptions',
-            icon: CreditCard,
-          },
-          {
-            title: t('System Settings'),
-            url: '/system-settings/site',
-            activeUrls: ['/system-settings'],
-            icon: Settings,
-          },
-        ],
+        items: adminItems,
       },
     ],
   }

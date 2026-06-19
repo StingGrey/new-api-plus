@@ -38,6 +38,11 @@ export interface AuthUser {
   aff_count?: number
   aff_quota?: number
   aff_history_quota?: number
+  // Rebate/dividend system fields (returned by /api/user/self)
+  gift_quota?: number
+  used_gift_quota?: number
+  dividend_balance?: number
+  dividend_total?: number
   inviter_id?: number
   github_id?: string
   oidc_id?: string

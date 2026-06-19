@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { parseCurrencyDisplayType } from '@/lib/currency'
 import { CheckinSettingsSection } from '../general/checkin-settings-section'
+import { DividendSettingsSection } from './dividend-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
 import { PaymentSettingsSection } from '../integrations/payment-settings-section'
@@ -197,6 +198,21 @@ const BILLING_SECTIONS = [
           enabled: settings['checkin_setting.enabled'],
           minQuota: settings['checkin_setting.min_quota'],
           maxQuota: settings['checkin_setting.max_quota'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'dividend',
+    titleKey: 'Dividend & Rebate',
+    build: (settings: BillingSettings) => (
+      <DividendSettingsSection
+        defaultValues={{
+          directRate: settings.AffiliateDirectRate,
+          indirectRate: settings.AffiliateIndirectRate,
+          rootDividendRate: settings.RootDividendRate,
+          settleEnabled: settings['affiliate_settle_setting.enabled'],
+          settleHour: settings['affiliate_settle_setting.settle_hour'],
         }}
       />
     ),
