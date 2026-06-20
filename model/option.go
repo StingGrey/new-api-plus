@@ -135,6 +135,7 @@ func InitOptionMap() {
 	common.OptionMap["AffiliateDirectRate"] = strconv.FormatFloat(common.AffiliateDirectRate, 'f', -1, 64)
 	common.OptionMap["AffiliateIndirectRate"] = strconv.FormatFloat(common.AffiliateIndirectRate, 'f', -1, 64)
 	common.OptionMap["RootDividendRate"] = strconv.FormatFloat(common.RootDividendRate, 'f', -1, 64)
+	common.OptionMap["AffiliateAdminIndirectRate"] = strconv.FormatFloat(common.AffiliateAdminIndirectRate, 'f', -1, 64)
 	common.OptionMap["QuotaRemindThreshold"] = strconv.Itoa(common.QuotaRemindThreshold)
 	common.OptionMap["PreConsumedQuota"] = strconv.Itoa(common.PreConsumedQuota)
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
@@ -145,6 +146,9 @@ func InitOptionMap() {
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
 	common.OptionMap["ModelCost"] = ratio_setting.ModelCost2JSONString()
 	common.OptionMap["ModelPricingSource"] = ratio_setting.ModelPricingSource2JSONString()
+	common.OptionMap["GroupModelRatio"] = ratio_setting.GroupModelRatio2JSONString()
+	common.OptionMap["GroupModelPrice"] = ratio_setting.GroupModelPrice2JSONString()
+	common.OptionMap["GroupModelCost"] = ratio_setting.GroupModelCost2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
@@ -512,6 +516,8 @@ func updateOptionMap(key string, value string) (err error) {
 		common.AffiliateIndirectRate, _ = strconv.ParseFloat(value, 64)
 	case "RootDividendRate":
 		common.RootDividendRate, _ = strconv.ParseFloat(value, 64)
+	case "AffiliateAdminIndirectRate":
+		common.AffiliateAdminIndirectRate, _ = strconv.ParseFloat(value, 64)
 	case "QuotaRemindThreshold":
 		common.QuotaRemindThreshold, _ = strconv.Atoi(value)
 	case "PreConsumedQuota":
@@ -546,6 +552,12 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateCompletionRatioByJSONString(value)
 	case "ModelPrice":
 		err = ratio_setting.UpdateModelPriceByJSONString(value)
+	case "GroupModelRatio":
+		err = ratio_setting.UpdateGroupModelRatioByJSONString(value)
+	case "GroupModelPrice":
+		err = ratio_setting.UpdateGroupModelPriceByJSONString(value)
+	case "GroupModelCost":
+		err = ratio_setting.UpdateGroupModelCostByJSONString(value)
 	case "CacheRatio":
 		err = ratio_setting.UpdateCacheRatioByJSONString(value)
 	case "CreateCacheRatio":
