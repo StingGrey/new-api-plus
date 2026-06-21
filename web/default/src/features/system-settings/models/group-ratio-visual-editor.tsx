@@ -19,6 +19,8 @@ For commercial licensing, please contact support@quantumnous.com
 import { useState, useMemo, useEffect, useCallback, memo } from 'react'
 import { Pencil, Plus, Trash2, GripVertical, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useAuthStore } from '@/stores/auth-store'
+import { ROLE } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -41,6 +43,7 @@ import { safeJsonParse } from '../utils/json-parser'
 
 type GroupRatioVisualEditorProps = {
   groupRatio: string
+  groupCostRatio: string
   topupGroupRatio: string
   userUsableGroups: string
   groupGroupRatio: string
@@ -57,6 +60,7 @@ type GroupPricingRow = {
   _id: string
   name: string
   ratio: number
+  costRatio: string // '' = 继承售价倍率; 数字字符串 = 单独配置
   selectable: boolean
   description: string
 }
@@ -83,11 +87,16 @@ function normalizeRatio(value: unknown): number {
 
 function buildGroupPricingRows(
   groupRatio: string,
+  groupCostRatio: string,
   userUsableGroups: string
 ): GroupPricingRow[] {
   const ratioMap = safeJsonParse<Record<string, number>>(groupRatio, {
     fallback: {},
     context: 'group ratios',
+  })
+  const costMap = safeJsonParse<Record<string, number>>(groupCostRatio, {
+    fallback: {},
+    context: 'group cost ratios',
   })
   const usableMap = safeJsonParse<Record<string, string>>(userUsableGroups, {
     fallback: {},
@@ -99,6 +108,9 @@ function buildGroupPricingRows(
     _id: createGroupPricingId(),
     name,
     ratio: normalizeRatio(ratioMap[name]),
+    costRatio: Object.prototype.hasOwnProperty.call(costMap, name)
+      ? String(costMap[name])
+      : '',
     selectable: Object.prototype.hasOwnProperty.call(usableMap, name),
     description: String(usableMap[name] ?? ''),
   }))
@@ -106,12 +118,17 @@ function buildGroupPricingRows(
 
 function serializeGroupPricingRows(rows: GroupPricingRow[]) {
   const groupRatio: Record<string, number> = {}
+  const groupCostRatio: Record<string, number> = {}
   const userUsableGroups: Record<string, string> = {}
 
   for (const row of rows) {
     const name = row.name.trim()
     if (!name) continue
     groupRatio[name] = normalizeRatio(row.ratio)
+    // 成本倍率仅当显式填写时才写入(空 = 继承售价倍率, 后端 GetGroupCostRatio 处理)
+    if (row.costRatio !== '') {
+      groupCostRatio[name] = normalizeRatio(row.costRatio)
+    }
     if (row.selectable) {
       userUsableGroups[name] = row.description
     }
@@ -119,6 +136,7 @@ function serializeGroupPricingRows(rows: GroupPricingRow[]) {
 
   return {
     GroupRatio: JSON.stringify(groupRatio, null, 2),
+    GroupCostRatio: JSON.stringify(groupCostRatio, null, 2),
     UserUsableGroups: JSON.stringify(userUsableGroups, null, 2),
   }
 }
@@ -127,6 +145,10 @@ function groupPricingSignature(rows: GroupPricingRow[]): string {
   const serialized = serializeGroupPricingRows(rows)
   return JSON.stringify({
     groupRatio: safeJsonParse(serialized.GroupRatio, {
+      fallback: {},
+      silent: true,
+    }),
+    groupCostRatio: safeJsonParse(serialized.GroupCostRatio, {
       fallback: {},
       silent: true,
     }),
@@ -139,10 +161,15 @@ function groupPricingSignature(rows: GroupPricingRow[]): string {
 
 function sourceGroupPricingSignature(
   groupRatio: string,
+  groupCostRatio: string,
   userUsableGroups: string
 ): string {
   return JSON.stringify({
     groupRatio: safeJsonParse(groupRatio, { fallback: {}, silent: true }),
+    groupCostRatio: safeJsonParse(groupCostRatio, {
+      fallback: {},
+      silent: true,
+    }),
     userUsableGroups: safeJsonParse(userUsableGroups, {
       fallback: {},
       silent: true,
@@ -152,6 +179,7 @@ function sourceGroupPricingSignature(
 
 export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
   groupRatio,
+  groupCostRatio,
   topupGroupRatio,
   userUsableGroups,
   groupGroupRatio,
@@ -398,6 +426,7 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
     <div className='space-y-4'>
       <GroupPricingTable
         groupRatio={groupRatio}
+        groupCostRatio={groupCostRatio}
         userUsableGroups={userUsableGroups}
         onChange={onChange}
       />
@@ -742,38 +771,44 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
 
 type GroupPricingTableProps = {
   groupRatio: string
+  groupCostRatio: string
   userUsableGroups: string
   onChange: (field: string, value: string) => void
 }
 
 function GroupPricingTable({
   groupRatio,
+  groupCostRatio,
   userUsableGroups,
   onChange,
 }: GroupPricingTableProps) {
   const { t } = useTranslation()
+  const isRoot =
+    (useAuthStore((s) => s.auth.user)?.role ?? 0) >= ROLE.SUPER_ADMIN
   const [rows, setRows] = useState<GroupPricingRow[]>(() =>
-    buildGroupPricingRows(groupRatio, userUsableGroups)
+    buildGroupPricingRows(groupRatio, groupCostRatio, userUsableGroups)
   )
 
   useEffect(() => {
     const incomingSignature = sourceGroupPricingSignature(
       groupRatio,
+      groupCostRatio,
       userUsableGroups
     )
     setRows((currentRows) => {
       if (groupPricingSignature(currentRows) === incomingSignature) {
         return currentRows
       }
-      return buildGroupPricingRows(groupRatio, userUsableGroups)
+      return buildGroupPricingRows(groupRatio, groupCostRatio, userUsableGroups)
     })
-  }, [groupRatio, userUsableGroups])
+  }, [groupRatio, groupCostRatio, userUsableGroups])
 
   const emitRows = useCallback(
     (nextRows: GroupPricingRow[]) => {
       setRows(nextRows)
       const serialized = serializeGroupPricingRows(nextRows)
       onChange('GroupRatio', serialized.GroupRatio)
+      onChange('GroupCostRatio', serialized.GroupCostRatio)
       onChange('UserUsableGroups', serialized.UserUsableGroups)
     },
     [onChange]
@@ -806,6 +841,7 @@ function GroupPricingTable({
         _id: createGroupPricingId(),
         name,
         ratio: 1,
+        costRatio: '',
         selectable: true,
         description: '',
       },
@@ -890,6 +926,26 @@ function GroupPricingTable({
                     }
                   />
                 ),
+              },
+              {
+                id: 'cost-ratio',
+                header: t('Group cost ratio'),
+                className: 'w-32',
+                cell: (row) =>
+                  isRoot ? (
+                    <Input
+                      type='number'
+                      min={0}
+                      step={0.1}
+                      placeholder={t('Inherit sale ratio')}
+                      value={row.costRatio}
+                      onChange={(event) =>
+                        updateRow(row._id, 'costRatio', event.target.value)
+                      }
+                    />
+                  ) : (
+                    <span className='text-muted-foreground px-3 text-sm'>—</span>
+                  ),
               },
               {
                 id: 'selectable',

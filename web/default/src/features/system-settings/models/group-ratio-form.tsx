@@ -61,6 +61,7 @@ import { GroupSpecialUsableRulesEditor } from './group-special-usable-editor'
 
 type GroupFormValues = {
   GroupRatio: string
+  GroupCostRatio: string
   TopupGroupRatio: string
   UserUsableGroups: string
   GroupGroupRatio: string
@@ -137,6 +138,7 @@ export const GroupRatioForm = memo(function GroupRatioForm({
           <div className='space-y-6'>
             <GroupRatioVisualEditor
               groupRatio={form.watch('GroupRatio')}
+              groupCostRatio={form.watch('GroupCostRatio')}
               topupGroupRatio={form.watch('TopupGroupRatio')}
               userUsableGroups={form.watch('UserUsableGroups')}
               groupGroupRatio={form.watch('GroupGroupRatio')}
@@ -190,6 +192,25 @@ export const GroupRatioForm = memo(function GroupRatioForm({
                   <FormDescription>
                     {t(
                       'JSON map of group → ratio applied when the user selects the group explicitly.'
+                    )}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='GroupCostRatio'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Group cost ratios')}</FormLabel>
+                  <FormControl>
+                    <Textarea rows={6} {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    {t(
+                      'JSON map of group → cost ratio (platform cost = official price × cost ratio). Leave a group out to inherit its sale ratio.'
                     )}
                   </FormDescription>
                   <FormMessage />

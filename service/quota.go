@@ -115,11 +115,8 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 		relayInfo.UsingGroup = autoGroup.(string)
 	}
 
+	// 废弃 GroupGroupRatio 二级倍率(2026-06-22): GroupRatio 是唯一分组售价倍率。
 	actualGroupRatio := groupRatio
-	userGroupRatio, ok := ratio_setting.GetGroupGroupRatio(relayInfo.UserGroup, relayInfo.UsingGroup)
-	if ok {
-		actualGroupRatio = userGroupRatio
-	}
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{
@@ -239,7 +236,7 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	if tieredResult != nil {
 		InjectTieredBillingInfo(other, relayInfo, tieredResult)
 	}
-	costQuota, _ := CalcModelCostQuota(modelName, relayInfo.UsingGroup, usage.InputTokens, usage.OutputTokens)
+	costQuota := CalcCostFromSaleQuota(quota, groupRatio, relayInfo.UsingGroup)
 	affAdminIdSnap, inviterIdSnap, inviter2IdSnap := GetAffiliateSnapshot(relayInfo.UserId)
 	// 双池记账(阶段2b): 按实际扣减拆分填, 无 BillingSession 时回退全本金。
 	paidGift, paidPrincipal := paidSplitForLog(relayInfo, quota)
@@ -370,7 +367,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	if tieredResult != nil {
 		InjectTieredBillingInfo(other, relayInfo, tieredResult)
 	}
-	costQuota, _ := CalcModelCostQuota(relayInfo.OriginModelName, relayInfo.UsingGroup, usage.PromptTokens, usage.CompletionTokens)
+	costQuota := CalcCostFromSaleQuota(quota, groupRatio, relayInfo.UsingGroup)
 	affAdminIdSnap, inviterIdSnap, inviter2IdSnap := GetAffiliateSnapshot(relayInfo.UserId)
 	// 双池记账(阶段2b): 按实际扣减拆分填, 无 BillingSession 时回退全本金。
 	paidGift, paidPrincipal := paidSplitForLog(relayInfo, quota)

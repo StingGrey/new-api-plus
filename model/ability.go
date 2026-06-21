@@ -53,6 +53,46 @@ func GetEnabledModels() []string {
 	return models
 }
 
+// ModelChannelCount 某分组下单个模型的渠道统计。
+type ModelChannelCount struct {
+	EnabledChannels int // enabled=true 的 distinct 渠道数(当前可用)
+	TotalChannels   int // 全部 distinct 渠道数(含禁用)
+}
+
+// GetModelChannelCountsByGroup 统计某分组下每个模型的渠道数(启用/总数)。
+// 用于分组定价预览的「可用渠道数/总渠道数」列与「无可用渠道/仅禁用渠道」状态判定。
+func GetModelChannelCountsByGroup(group string) map[string]ModelChannelCount {
+	result := make(map[string]ModelChannelCount)
+	if group == "" {
+		return result
+	}
+	var abilities []Ability
+	DB.Select("model, channel_id, enabled").Where(commonGroupCol+" = ?", group).Find(&abilities)
+	type chanSets struct {
+		enabled map[int]struct{}
+		total   map[int]struct{}
+	}
+	acc := make(map[string]*chanSets)
+	for _, a := range abilities {
+		s, ok := acc[a.Model]
+		if !ok {
+			s = &chanSets{enabled: map[int]struct{}{}, total: map[int]struct{}{}}
+			acc[a.Model] = s
+		}
+		s.total[a.ChannelId] = struct{}{}
+		if a.Enabled {
+			s.enabled[a.ChannelId] = struct{}{}
+		}
+	}
+	for m, s := range acc {
+		result[m] = ModelChannelCount{
+			EnabledChannels: len(s.enabled),
+			TotalChannels:   len(s.total),
+		}
+	}
+	return result
+}
+
 func GetAllEnableAbilities() []Ability {
 	var abilities []Ability
 	DB.Find(&abilities, "enabled = ?", true)

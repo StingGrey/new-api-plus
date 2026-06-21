@@ -208,6 +208,9 @@ func SetApiRouter(router *gin.Engine) {
 			optionRoute.POST("/waffo-pancake/subscription-product-options", controller.ListWaffoPancakeSubscriptionProductOptions)
 		}
 
+		// 分组定价预览(2026-06-22): 管理员以上可访问, 成本/毛利字段仅 Root 返回(controller 内裁剪)。
+		apiRouter.GET("/option/pricing/group-preview", middleware.AdminAuth(), controller.GetGroupPricingPreview)
+
 		// Withdraw review (root only): rebate/dividend withdrawal approval queue
 		withdrawRoute := apiRouter.Group("/withdraw")
 		withdrawRoute.Use(middleware.RootAuth())

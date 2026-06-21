@@ -153,6 +153,7 @@ func InitOptionMap() {
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
 	common.OptionMap["CreateCacheRatio"] = ratio_setting.CreateCacheRatio2JSONString()
 	common.OptionMap["GroupRatio"] = ratio_setting.GroupRatio2JSONString()
+	common.OptionMap["GroupCostRatio"] = ratio_setting.GroupCostRatio2JSONString()
 	common.OptionMap["GroupGroupRatio"] = ratio_setting.GroupGroupRatio2JSONString()
 	common.OptionMap["UserUsableGroups"] = setting.UserUsableGroups2JSONString()
 	common.OptionMap["CompletionRatio"] = ratio_setting.CompletionRatio2JSONString()
@@ -193,6 +194,7 @@ func InitOptionMap() {
 
 	common.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
+	migrateGroupModelPricingV1()
 }
 
 func loadOptionsFromDatabase() {
@@ -260,6 +262,33 @@ func UpdateOptionsBulk(values map[string]string) error {
 		}
 	}
 	return nil
+}
+
+// migrateGroupModelPricingV1 一次性迁移(2026-06-22, plan mellow-growing-waterfall.md):
+// 清空废弃的分组独立模型价 GroupModelRatio/Price/Cost。本次重构改为「全局官方价 × 分组
+// 售价倍率(GroupRatio) × 分组成本倍率(GroupCostRatio)」模式, 旧的按分组逐模型覆盖价不再生效。
+// 哨兵 option 保证只执行一次; 历史 log.Cost 快照不受影响(T+1 只读快照)。
+func migrateGroupModelPricingV1() {
+	const sentinel = "group_model_pricing_migration_v1"
+	var existing Option
+	if DB.Where("key = ?", sentinel).First(&existing).Error == nil && existing.Value == "true" {
+		return // 已迁移
+	}
+	keys := []string{"GroupModelRatio", "GroupModelPrice", "GroupModelCost"}
+	for _, k := range keys {
+		var opt Option
+		hasOld := DB.Where("key = ?", k).First(&opt).Error == nil && opt.Value != "" && opt.Value != "{}"
+		if hasOld {
+			common.SysLog("[group-model-pricing-migration-v1] 清空废弃分组独立模型价: " + k)
+		}
+		_ = UpdateOption(k, "{}") // 持久化 + 清空内存快照(触发 updateOptionMap)
+	}
+	// 写哨兵: 直接 DB 持久化(不经 updateOptionMap, 该 key 无 switch case)
+	sentinelOpt := Option{Key: sentinel}
+	DB.FirstOrCreate(&sentinelOpt, Option{Key: sentinel})
+	sentinelOpt.Value = "true"
+	DB.Save(&sentinelOpt)
+	common.SysLog("[group-model-pricing-migration-v1] 完成: GroupModelRatio/Price/Cost 已清空, 后续走「全局官方价 × 分组倍率」")
 }
 
 func updateOptionMap(key string, value string) (err error) {
@@ -547,6 +576,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateModelPricingSourceByJSONString(value)
 	case "GroupRatio":
 		err = ratio_setting.UpdateGroupRatioByJSONString(value)
+	case "GroupCostRatio":
+		err = ratio_setting.UpdateGroupCostRatioByJSONString(value)
 	case "GroupGroupRatio":
 		err = ratio_setting.UpdateGroupGroupRatioByJSONString(value)
 	case "UserUsableGroups":
