@@ -46,14 +46,10 @@ func GetPricing(c *gin.Context) {
 		user, err := model.GetUserCache(userId.(int))
 		if err == nil {
 			group = user.Group
-			for g := range groupRatio {
-				ratio, ok := ratio_setting.GetGroupGroupRatio(group, g)
-				if ok {
-					groupRatio[g] = ratio
-				}
-			}
 		}
 	}
+	// 废弃 GroupGroupRatio 二级倍率(2026-06-22): groupRatio 直接用 GroupRatio(唯一分组售价倍率),
+	// 与实际计费一致, 不再用 GroupGroupRatio 覆盖。
 
 	usableGroup = service.GetUserUsableGroups(group)
 	pricing = filterPricingByUsableGroups(pricing, usableGroup)

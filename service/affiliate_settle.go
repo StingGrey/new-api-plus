@@ -48,6 +48,7 @@ func RunDailySettle(batchId string, dayStart, dayEnd int64) error {
 	dIndirect := decimal.NewFromFloat(common.AffiliateIndirectRate)
 	dRoot := decimal.NewFromFloat(common.RootDividendRate)
 	dMaxDiv := decimal.NewFromFloat(common.MaxDividendRate())
+	dAdminDirect := decimal.NewFromFloat(common.AffiliateAdminDirectRate)     // 管理员直接拉新分红
 	dAdminIndirect := decimal.NewFromFloat(common.AffiliateAdminIndirectRate) // 管理员间接/三层+拉新分红
 	root := model.GetRootUser()
 
@@ -73,6 +74,10 @@ func RunDailySettle(batchId string, dayStart, dayEnd int64) error {
 	}
 
 	processLog := func(log *model.Log) {
+		// 超管自己的消费不计入分润/利润(超管使用站内 API 不产生任何分润; log 仍会被批量标记 settled)
+		if u := getUser(log.UserId); u != nil && u.Role >= common.RoleRootUser {
+			return
+		}
 		gross := CalcGrossProfit(log.PaidQuota, log.PaidGiftQuota, log.Cost)
 		if gross <= 0 {
 			return
@@ -96,12 +101,12 @@ func RunDailySettle(batchId string, dayStart, dayEnd int64) error {
 			}
 		}
 		// 管理员分红(树顶管理员, 按层级距离):
-		//   - 直接上级是管理员(InviterIdSnap==admin): 用管理员个人 DividendRate(上限 MaxDividendRate)
+		//   - 直接上级是管理员(InviterIdSnap==admin): 用全局 AffiliateAdminDirectRate(上限 MaxDividendRate)
 		//   - 间接/三层+(树顶但非直接上级): 用全局 AffiliateAdminIndirectRate(默认 22%)
 		if admin := getUser(log.AffAdminIdSnap); admin != nil && admin.Role >= common.RoleAdminUser {
 			var rate decimal.Decimal
 			if log.InviterIdSnap == admin.Id {
-				rate = decimal.NewFromFloat(admin.DividendRate)
+				rate = dAdminDirect
 				if rate.GreaterThan(dMaxDiv) {
 					rate = dMaxDiv
 				}

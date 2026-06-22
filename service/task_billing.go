@@ -14,12 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// calcTaskCost 异步任务(图片/视频,按次计费)的平台成本。
-// 调 CalcModelCostQuota(tokens=0,0) → per-request 模式走 CostPerRequest 分支;
-// 未配成本返回 0(毛利=收入)。
-func calcTaskCost(modelName, group string) int {
-	c, _ := CalcModelCostQuota(modelName, group, 0, 0)
-	return c
+// calcTaskCost 异步任务(图片/视频)的平台成本: 从售价反推, 与售价同源(见 service/cost.go)。
+//   - saleQuota       任务实际扣费 / 退款额度 / 差额额度
+//   - saleGroupRatio  任务预扣时的分组倍率(取 BillingContext 快照)
+//   - group           任务所属分组(task.Group)
+func calcTaskCost(saleQuota int, saleGroupRatio float64, group string) int {
+	return CalcCostFromSaleQuota(saleQuota, saleGroupRatio, group)
 }
 
 // LogTaskConsumption 记录任务消费日志和统计信息（仅记录，不涉及实际扣费）。
@@ -68,7 +68,7 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		Quota:     info.PriceData.Quota,
 		// 异步任务(图片/视频)通常按次计费, ModelCost($/1M tokens) 不适用, 成本暂记 0。
 		// 后续可扩展按次成本(ModelCost 增加 per-call 字段); 快照仍填写供 T+1 分润用。
-		Cost: calcTaskCost(info.OriginModelName, info.UsingGroup),
+		Cost: calcTaskCost(info.PriceData.Quota, info.PriceData.GroupRatioInfo.GroupRatio, info.UsingGroup),
 		PaidQuota:      paidPrincipal,
 		PaidGiftQuota:  paidGift,
 		AffAdminIdSnap: affAdminIdSnap,
@@ -213,6 +213,11 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 	other := taskBillingOther(task)
 	other["task_id"] = task.TaskID
 	other["reason"] = reason
+	// 退款对应的成本: 从退款额度反推(与正向消费同口径), 分组倍率取预扣时 BillingContext 快照
+	refundGroupRatio := 1.0
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.GroupRatio > 0 {
+		refundGroupRatio = bc.GroupRatio
+	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:          task.UserId,
 		LogType:         model.LogTypeRefund,
@@ -220,7 +225,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) {
 		ChannelId:       task.ChannelId,
 		ModelName:       taskModelName(task),
 		Quota:           quota,
-		Cost: calcTaskCost(taskModelName(task), ""),
+		Cost: calcTaskCost(quota, refundGroupRatio, task.Group),
 		PaidQuota:       paidPrincipal,
 		PaidGiftQuota:   paidGift,
 		AffAdminIdSnap:  affAdminIdSnap,
@@ -284,6 +289,11 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	other["task_id"] = task.TaskID
 	other["pre_consumed_quota"] = preConsumedQuota
 	other["actual_quota"] = actualQuota
+	// 差额对应的成本: 从差额额度反推(与正向消费同口径), 分组倍率取预扣时 BillingContext 快照
+	deltaGroupRatio := 1.0
+	if bc := task.PrivateData.BillingContext; bc != nil && bc.GroupRatio > 0 {
+		deltaGroupRatio = bc.GroupRatio
+	}
 	model.RecordTaskBillingLog(model.RecordTaskBillingLogParams{
 		UserId:          task.UserId,
 		LogType:         logType,
@@ -291,7 +301,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		ChannelId:       task.ChannelId,
 		ModelName:       taskModelName(task),
 		Quota:           logQuota,
-		Cost: calcTaskCost(taskModelName(task), ""),
+		Cost: calcTaskCost(logQuota, deltaGroupRatio, task.Group),
 		PaidQuota:       paidPrincipal,
 		PaidGiftQuota:   paidGift,
 		AffAdminIdSnap:  affAdminIdSnap,
@@ -332,15 +342,8 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 		return
 	}
 
-	groupRatio := ratio_setting.GetGroupRatio(group)
-	userGroupRatio, hasUserGroupRatio := ratio_setting.GetGroupGroupRatio(group, group)
-
-	var finalGroupRatio float64
-	if hasUserGroupRatio {
-		finalGroupRatio = userGroupRatio
-	} else {
-		finalGroupRatio = groupRatio
-	}
+	// 废弃 GroupGroupRatio 二级倍率(2026-06-22): GroupRatio 是唯一分组售价倍率。
+	finalGroupRatio := ratio_setting.GetGroupRatio(group)
 
 	// 计算 OtherRatios 乘积（视频折扣、时长等）
 	otherMultiplier := 1.0

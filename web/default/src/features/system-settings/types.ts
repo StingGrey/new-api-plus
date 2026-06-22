@@ -171,6 +171,7 @@ export type ModelSettings = {
   'tool_price_setting.prices': string
   TopupGroupRatio: string
   GroupRatio: string
+  GroupCostRatio: string
   UserUsableGroups: string
   GroupGroupRatio: string
   AutoGroups: string
@@ -217,6 +218,7 @@ export type BillingSettings = {
   'tool_price_setting.prices': string
   TopupGroupRatio: string
   GroupRatio: string
+  GroupCostRatio: string
   UserUsableGroups: string
   GroupGroupRatio: string
   AutoGroups: string
@@ -275,6 +277,7 @@ export type BillingSettings = {
   AffiliateDirectRate: number
   AffiliateIndirectRate: number
   RootDividendRate: number
+  AffiliateAdminDirectRate: number
   AffiliateAdminIndirectRate: number
   'affiliate_settle_setting.enabled': boolean
   'affiliate_settle_setting.settle_hour': number
@@ -320,10 +323,6 @@ export type OperationsSettings = {
   'tutorial_setting.content': string
   // 顶部导航排序(JSON 数组 of navKey, 超管后台可配)
   TopNavOrder: string
-  // 分组独立模型定价(渠道分组维度, 需求2): miss 回退全局, 废 GroupRatio 倍率
-  GroupModelRatio: string
-  GroupModelPrice: string
-  GroupModelCost: string
 }
 
 export type SecuritySettings = {

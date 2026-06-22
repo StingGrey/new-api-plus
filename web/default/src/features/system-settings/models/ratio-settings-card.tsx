@@ -30,6 +30,7 @@ import { SettingsPageTitleStatusPortal } from '../components/settings-page-conte
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { GroupRatioForm } from './group-ratio-form'
+import { GroupPricingPreviewCard } from './group-pricing-preview-card'
 import { ModelRatioForm } from './model-ratio-form'
 import { ToolPriceSettings } from './tool-price-settings'
 import { UpstreamRatioSync } from './upstream-ratio-sync'
@@ -115,6 +116,7 @@ const createModelSchema = (t: Translate) =>
 const createGroupSchema = (t: Translate) =>
   z.object({
     GroupRatio: createJsonStringField(t),
+    GroupCostRatio: createJsonStringField(t),
     TopupGroupRatio: createJsonStringField(t),
     UserUsableGroups: createJsonStringField(t),
     GroupGroupRatio: createJsonStringField(t),
@@ -191,6 +193,7 @@ export function RatioSettingsCard({
 
   const groupNormalizedDefaults = useRef({
     GroupRatio: normalizeJsonString(groupDefaults.GroupRatio),
+    GroupCostRatio: normalizeJsonString(groupDefaults.GroupCostRatio),
     TopupGroupRatio: normalizeJsonString(groupDefaults.TopupGroupRatio),
     UserUsableGroups: normalizeJsonString(groupDefaults.UserUsableGroups),
     GroupGroupRatio: normalizeJsonString(groupDefaults.GroupGroupRatio),
@@ -231,6 +234,7 @@ export function RatioSettingsCard({
     defaultValues: {
       ...groupDefaults,
       GroupRatio: formatJsonForTextarea(groupDefaults.GroupRatio),
+      GroupCostRatio: formatJsonForTextarea(groupDefaults.GroupCostRatio),
       TopupGroupRatio: formatJsonForTextarea(groupDefaults.TopupGroupRatio),
       UserUsableGroups: formatJsonForTextarea(groupDefaults.UserUsableGroups),
       GroupGroupRatio: formatJsonForTextarea(groupDefaults.GroupGroupRatio),
@@ -283,6 +287,7 @@ export function RatioSettingsCard({
   useEffect(() => {
     groupNormalizedDefaults.current = {
       GroupRatio: normalizeJsonString(groupDefaults.GroupRatio),
+      GroupCostRatio: normalizeJsonString(groupDefaults.GroupCostRatio),
       TopupGroupRatio: normalizeJsonString(groupDefaults.TopupGroupRatio),
       UserUsableGroups: normalizeJsonString(groupDefaults.UserUsableGroups),
       GroupGroupRatio: normalizeJsonString(groupDefaults.GroupGroupRatio),
@@ -296,6 +301,7 @@ export function RatioSettingsCard({
     groupForm.reset({
       ...groupDefaults,
       GroupRatio: formatJsonForTextarea(groupDefaults.GroupRatio),
+      GroupCostRatio: formatJsonForTextarea(groupDefaults.GroupCostRatio),
       TopupGroupRatio: formatJsonForTextarea(groupDefaults.TopupGroupRatio),
       UserUsableGroups: formatJsonForTextarea(groupDefaults.UserUsableGroups),
       GroupGroupRatio: formatJsonForTextarea(groupDefaults.GroupGroupRatio),
@@ -355,6 +361,7 @@ export function RatioSettingsCard({
     async (values: GroupFormValues) => {
       const normalized = {
         GroupRatio: normalizeJsonString(values.GroupRatio),
+        GroupCostRatio: normalizeJsonString(values.GroupCostRatio),
         TopupGroupRatio: normalizeJsonString(values.TopupGroupRatio),
         UserUsableGroups: normalizeJsonString(values.UserUsableGroups),
         GroupGroupRatio: normalizeJsonString(values.GroupGroupRatio),
@@ -424,11 +431,14 @@ export function RatioSettingsCard({
     }
     if (tab === 'groups') {
       return (
-        <GroupRatioForm
-          form={groupForm}
-          onSave={saveGroupRatios}
-          isSaving={updateOption.isPending}
-        />
+        <div className='space-y-6'>
+          <GroupRatioForm
+            form={groupForm}
+            onSave={saveGroupRatios}
+            isSaving={updateOption.isPending}
+          />
+          <GroupPricingPreviewCard />
+        </div>
       )
     }
     if (tab === 'tool-prices') {

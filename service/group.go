@@ -53,13 +53,10 @@ func GetUserAutoGroup(userGroup string) []string {
 	return autoGroups
 }
 
-// GetUserGroupRatio 获取用户使用某个分组的倍率
-// userGroup 用户分组
-// group 需要获取倍率的分组
+// GetUserGroupRatio 获取用户使用某个分组的倍率。
+// 废弃 GroupGroupRatio 二级倍率(2026-06-22): 统一返回 GroupRatio(唯一分组售价倍率),
+// 与实际计费一致。保留 userGroup 参数以兼容现有调用方(controller/group.go 展示用)。
 func GetUserGroupRatio(userGroup, group string) float64 {
-	ratio, ok := ratio_setting.GetGroupGroupRatio(userGroup, group)
-	if ok {
-		return ratio
-	}
+	_ = userGroup
 	return ratio_setting.GetGroupRatio(group)
 }

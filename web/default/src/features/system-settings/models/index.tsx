@@ -59,6 +59,7 @@ const defaultModelSettings: ModelSettings = {
   'tool_price_setting.prices': '{}',
   TopupGroupRatio: '',
   GroupRatio: '',
+  GroupCostRatio: '',
   UserUsableGroups: '',
   GroupGroupRatio: '',
   AutoGroups: '',

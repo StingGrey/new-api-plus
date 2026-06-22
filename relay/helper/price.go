@@ -49,28 +49,20 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 		relayInfo.UsingGroup = autoGroup.(string)
 	}
 
-	// check user group special ratio
-	userGroupRatio, ok := ratio_setting.GetGroupGroupRatio(relayInfo.UserGroup, relayInfo.UsingGroup)
-	if ok {
-		// user group special ratio
+	// 废弃 GroupGroupRatio 二级倍率(2026-06-22): GroupRatio 是唯一分组售价倍率。
+	// GroupSpecialRatio 保留 GetGroupGroupRatio 值仅供审计展示, 不再参与计费。
+	if userGroupRatio, ok := ratio_setting.GetGroupGroupRatio(relayInfo.UserGroup, relayInfo.UsingGroup); ok {
 		groupRatioInfo.GroupSpecialRatio = userGroupRatio
-		groupRatioInfo.GroupRatio = userGroupRatio
 		groupRatioInfo.HasSpecialRatio = true
-	} else {
-		// normal group ratio
-		groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 	}
+	groupRatioInfo.GroupRatio = ratio_setting.GetGroupRatio(relayInfo.UsingGroup)
 
 	return groupRatioInfo
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (types.PriceData, error) {
-	groupRatioInfo := HandleGroupRatio(c, info) // 先解析 auto → UsingGroup
-	// 废倍率(需求2): 计费 GroupRatio 恒 1 —— 分组独立价已含在 modelRatio/Price(ForGroup),
-	// 原分组倍率保留在 GroupSpecialRatio 仅供审计。下游所有 ×GroupRatio 自然 = ×1 = 分组价。
-	groupRatioInfo.GroupRatio = 1.0
-
-	modelPrice, usePrice := ratio_setting.GetModelPriceForGroup(info.OriginModelName, info.UsingGroup, false)
+	groupRatioInfo := HandleGroupRatio(c, info) // 先解析 auto → UsingGroup, 得到 GroupRatio(唯一分组售价倍率)
+	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(info.OriginModelName) == billing_setting.BillingModeTieredExpr {
@@ -95,7 +87,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		}
 		var success bool
 		var matchName string
-		modelRatio, success, matchName = ratio_setting.GetModelRatioForGroup(info.OriginModelName, info.UsingGroup)
+		modelRatio, success, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
 		if !success {
 			acceptUnsetRatio := false
 			if info.UserSetting.AcceptUnsetRatioModel {
@@ -168,10 +160,9 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 
 // ModelPriceHelperPerCall 按次/按量计费的 PriceHelper (MJ、Task)
 func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
-	groupRatioInfo := HandleGroupRatio(c, info)
-	groupRatioInfo.GroupRatio = 1.0 // 废倍率(需求2)
+	groupRatioInfo := HandleGroupRatio(c, info) // 先解析 auto → UsingGroup, 得到 GroupRatio(唯一分组售价倍率)
 
-	modelPrice, success := ratio_setting.GetModelPriceForGroup(info.OriginModelName, info.UsingGroup, true)
+	modelPrice, success := ratio_setting.GetModelPrice(info.OriginModelName, true)
 	usePrice := success
 	var modelRatio float64
 
@@ -183,7 +174,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		} else {
 			var ratioSuccess bool
 			var matchName string
-			modelRatio, ratioSuccess, matchName = ratio_setting.GetModelRatioForGroup(info.OriginModelName, info.UsingGroup)
+			modelRatio, ratioSuccess, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
 			acceptUnsetRatio := false
 			if info.UserSetting.AcceptUnsetRatioModel {
 				acceptUnsetRatio = true
